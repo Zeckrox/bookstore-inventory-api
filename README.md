@@ -85,5 +85,5 @@ http://localhost:8000/
 ---
 
 ## Colección de Postman
-Se incluye archivo `BookstoreInvetoryApi.postman_collection.json` con todos los endpoints.
+Se incluye archivo `BookstoreInventoryApi.postman_collection.json` con todos los endpoints.
 

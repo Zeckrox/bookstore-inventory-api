@@ -4,6 +4,9 @@ from api.models import Book
 from rest_framework import status
 from api.serializers import BookSerializer
 from rest_framework.pagination import PageNumberPagination
+import requests
+from api.data import get_currency, DEFAULT_RATES
+import datetime
 
 @api_view(['GET','POST'])
 def manage_books(request):
@@ -79,3 +82,56 @@ def low_stock_books(request):
 
     serializer = BookSerializer(books, many=True)
     return Response(serializer.data, status=status.HTTP_200_OK)
+
+# Calcular precio de venta sugerido
+@api_view(['POST'])
+def calculate_price(request, id):
+    # Verificamos al existencia del libro.
+    try:
+        book = Book.objects.get(id=id)
+    except Book.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+    
+    # Valores fijos
+    margin_percentage = 40
+    cost_usd = float(book.cost_usd)
+    currency = get_currency(book.supplier_country)
+
+    # Nos comunicamos con la API
+    response = requests.get("https://api.exchangerate-api.com/v4/latest/USD")
+    if response.status_code == 200:
+        exchange_rate = response.json()["rates"].get(currency)
+        cost_local = (cost_usd * exchange_rate)
+        selling_price_local = round(cost_local * (1 + margin_percentage/100),2)
+        book.selling_price_local = selling_price_local
+        book.save()
+        calculation_timestamp = datetime.datetime.now()
+        return Response({
+        "book_id": book.id,
+        "cost_usd": cost_usd,
+        "exchange_rate": exchange_rate,
+        "cost_local": round(cost_local, 2),
+        "margin_percentage": margin_percentage,
+        "selling_price_local": selling_price_local,
+        "currency": currency,
+        "calculation_timestamp": calculation_timestamp
+        })
+
+    # Si la API de cambio falla, usar tasa por defecto
+    else:
+        exchange_rate = DEFAULT_RATES.get(currency)
+        cost_local = (cost_usd * exchange_rate)
+        selling_price_local = round(cost_local * (1 + margin_percentage/100),2)
+        book.selling_price_local = selling_price_local
+        book.save()
+        calculation_timestamp = datetime.datetime.now()
+        return Response({
+        "book_id": book.id,
+        "cost_usd": cost_usd,
+        "exchange_rate": exchange_rate,
+        "cost_local": round(cost_local, 2),
+        "margin_percentage": margin_percentage,
+        "selling_price_local": selling_price_local,
+        "currency": currency,
+        "calculation_timestamp": calculation_timestamp
+        }, status=status.HTTP_503_SERVICE_UNAVAILABLE)

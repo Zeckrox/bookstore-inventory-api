@@ -1,11 +1,12 @@
 services:
-  web:
+  api:
+    env_file: .env
+    environment:
+      - DEBUG_MODE=False
     build: .
-    container_name: bookstore_api
     ports:
-      - "8000:8000"
+      - 8000:8000
+    container_name: bookstore_api
     volumes:
       - .:/app
       - ./db.sqlite3:/app/db.sqlite3
-    environment:
-      - DEBUG=False
